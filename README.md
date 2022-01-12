@@ -1,2 +1,2 @@
 # Sudoku
-Sudoku game client side
+client side Sudoku game
