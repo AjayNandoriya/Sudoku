@@ -28,6 +28,25 @@ def check_sudoku_board(board):
                     return False
     return True
 
+
+def check_sub_row(possible_cells, row_id):
+    for col_offset in range(3):
+        sub_row_set = set()
+        for j in range(3):
+            sub_row_set.add(possible_cells[row_id][col_offset * 3 + j])
+        if len(sub_row_set) <3:
+            return False
+    return True
+
+def check_sub_col(possible_cells, col_id):
+    for row_offset in range(3):
+        sub_col_set = set()
+        for j in range(3):
+            sub_col_set.add(possible_cells[row_offset*3 + j][col_id])
+        if len(sub_col_set) <3:
+            return False
+    return True
+
 def check_sudoku_row(board, row, col):
     """
     Check if the Sudoku board is valid.
@@ -60,7 +79,7 @@ def check_sudoku_block(board, row, col):
     col_start = col - col % block_size
 
     gt = set(range(1, board_size + 1))
-    r = set(board[row_start:(row_start+block_size),col_start:(col_start+block_size)])
+    r = set(board[row_start:(row_start+block_size),col_start:(col_start+block_size)].flatten())
     if r != gt:
         return False
     return True
@@ -76,6 +95,25 @@ def is_valid_action(action, board):
         return False
     return True
 
+def check_sub_blocks(possible_cells):
+    board_size = len(possible_cells)
+    for i in range(board_size):
+        if not check_sub_row(possible_cells, row_id=i):
+            return False
+        if not check_sub_col(possible_cells, col_id=id):
+            return False
+    return True
+
+def calc_possible_cells(board):
+    
+    board_size = board.shape[0]
+    gt = set(range(1, board_size + 1))
+    possible_cells = [[set()]*board_size]*board_size
+    for i in range(board_size):
+        for j in range(board_size):
+            if board[i, j] == 0:
+                possible_cells[i][j] = gt-set([board[i,j]])
+    return possible_cells
 class SudokuEnv(gym.Env):
     FILLED_ERROR_REWARD = -10
     VALID_STEP_REWARD = 0
@@ -83,8 +121,10 @@ class SudokuEnv(gym.Env):
     def __init__(self) -> None:
         super().__init__()
         # self.observation_space = spaces.MultiDiscrete([10]*81)
-        self.action_space =spaces.MultiDiscrete([9,9,9]) # [ROW,COL,VAL]
+        self.action_space =spaces.MultiDiscrete([9,9,10]) # [ROW,COL,VAL]
         self.seed()
+        self.reset()
+
     def step(self, action):
         done = False
         info = {}
@@ -101,7 +141,9 @@ class SudokuEnv(gym.Env):
         # update
         self.board[action[0],action[1]] = action[2]
         # check
-        if check_sudoku_board(self.board):
+        possible_cells = calc_possible_cells(self.board)
+
+        if check_sudoku_board(self.board) and check_sub_blocks(possible_cells):
             done = True
             reward = SudokuEnv.SUCCESS_REWARD
         else:
@@ -119,7 +161,7 @@ class SudokuEnv(gym.Env):
                     if self.board[r,c] not in vals:
                         vals.append(self.board[r,c])
                     else:
-                        print(f"{r},{c} is duplicated")
+                        # print(f"{r},{c} is duplicated")
                         self.board[r,c] = 0
         # col
         for c in range(9):
@@ -129,7 +171,7 @@ class SudokuEnv(gym.Env):
                     if self.board[r,c] not in vals:
                         vals.append(self.board[r,c])
                     else:
-                        print(f"{r},{c} is duplicated")
+                        # print(f"{r},{c} is duplicated")
                         self.board[r,c] = 0
         # block
         for r in range(0,9,3):
@@ -141,8 +183,9 @@ class SudokuEnv(gym.Env):
                             if self.board[r+i,c+j] not in vals:
                                 vals.append(self.board[r+i,c+j])
                             else:
-                                print(f"{r+i},{c+j} is duplicated")
+                                # print(f"{r+i},{c+j} is duplicated")
                                 self.board[r+i,c+j] = 0
+        self.board[:,:]= 0
         return self.board
     def render(self, mode="human"):
         for r in range(9):
@@ -161,7 +204,6 @@ class SudokuEnv(gym.Env):
 
 def test_sudokuEnv():
     env = SudokuEnv()
-    env.reset()
     print('Initial board:')
     env.render()
     actions = []
