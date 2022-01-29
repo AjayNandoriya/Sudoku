@@ -6,6 +6,30 @@ if __package__ is None or __package__ == '':
     sys.path.append(BASE_PATH) 
 from sudoku.scripts.env.sudoku import SudokuEnv, calc_possible_cells, check_sub_row, check_sub_col
 
+def check_action(possisble_cells, board, action):
+    """
+    Check if the action is valid."""
+    if possisble_cells[action[0],action[1], action[2]-1] == False:
+        return False
+
+    
+    new_stat = np.copy(possisble_cells)
+    new_stat[action[0],:,action[2]-1] = False
+    new_stat[:,action[1],action[2]-1] = False
+    new_stat[action[0]//3*3:(action[0]//3*3+3),action[1]//3*3:(action[1]//3*3+3),action[2]-1] = False
+    new_board = np.copy(board)
+    new_board[action[0],action[1]] = action[2]
+    for i in range(3):
+        
+        min_sub_row = np.sum(new_board[action[0], i*3:(i+1)*3] == 0)
+        min_sub_col = np.sum(new_board[i*3:(i+1)*3, action[1]] == 0)
+        sub_row = np.any(new_stat[action[0], i*3:i*3+3, :], axis=0)
+        sub_col = np.any(new_stat[i*3:i*3+3, action[1], :], axis=0)
+        if np.sum(sub_row)< min_sub_row or np.sum(sub_col)< min_sub_col:
+            return False
+    return True
+    
+
 def calc_action(board:np.ndarray)->np.ndarray:
     """
     Calculate the next action to take."""
@@ -43,17 +67,16 @@ def calc_action(board:np.ndarray)->np.ndarray:
         if len(possible_values) == 1:
             single_actions.append([empty_cell[0],empty_cell[1],list(possible_values)[0]])
         if len(possible_values)>0:
-            possible_actions.append([empty_cell[0],empty_cell[1],list(possible_values)[0]])
+            possible_actions +=[[empty_cell[0],empty_cell[1],v] for v in list(possible_values)]
         else:
             pass
     if len(single_actions)>0:
         return np.array(single_actions[0])
 
     valid_actions = [] 
+    possisble_cells = calc_possible_cells(board)
     for action in possible_actions:
-        tmp_board = np.copy(board)
-        tmp_board[action[0],action[1]] = action[2]
-        if check_sub_row(tmp_board, action[0]) and check_sub_col(tmp_board, action[1]):
+        if check_action(possisble_cells, board, action):
             valid_actions.append(action)
     if len(valid_actions)>0:
         return np.array(valid_actions[0])

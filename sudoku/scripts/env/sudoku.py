@@ -29,21 +29,19 @@ def check_sudoku_board(board):
     return True
 
 
-def check_sub_row(possible_cells, row_id):
+def check_sub_row(possible_cells,board, row_id):
     for col_offset in range(3):
-        sub_row_set = set()
-        for j in range(3):
-            sub_row_set.add(possible_cells[row_id][col_offset * 3 + j])
-        if len(sub_row_set) <3:
+        min_sub_row = np.sum(board[row_id, col_offset*3:(col_offset*3+3)] == 0, axis=0)
+        sub_row = np.any(possible_cells[row_id, col_offset*3:(col_offset*3+3),:], axis=0)
+        if np.sum(sub_row) <min_sub_row:
             return False
     return True
 
-def check_sub_col(possible_cells, col_id):
+def check_sub_col(possible_cells, board, col_id):
     for row_offset in range(3):
-        sub_col_set = set()
-        for j in range(3):
-            sub_col_set.add(possible_cells[row_offset*3 + j][col_id])
-        if len(sub_col_set) <3:
+        min_col_row = np.sum(board[row_offset*3:(row_offset*3+3),col_id] == 0, axis=0)
+        sub_col = np.any(possible_cells[row_offset*3:(row_offset*3+3), col_id,:], axis=0)
+        if np.sum(sub_col) <min_col_row:
             return False
     return True
 
@@ -95,24 +93,24 @@ def is_valid_action(action, board):
         return False
     return True
 
-def check_sub_blocks(possible_cells):
+def check_sub_blocks(possible_cells, board):
     board_size = len(possible_cells)
     for i in range(board_size):
-        if not check_sub_row(possible_cells, row_id=i):
+        if not check_sub_row(possible_cells, board, row_id=i):
             return False
-        if not check_sub_col(possible_cells, col_id=id):
+        if not check_sub_col(possible_cells, board, col_id=i):
             return False
     return True
 
 def calc_possible_cells(board):
-    
     board_size = board.shape[0]
-    gt = set(range(1, board_size + 1))
-    possible_cells = [[set()]*board_size]*board_size
+    possible_cells = np.ones((board_size, board_size, 9), dtype=np.bool)
     for i in range(board_size):
         for j in range(board_size):
-            if board[i, j] == 0:
-                possible_cells[i][j] = gt-set([board[i,j]])
+            if board[i,j]!=0:
+                possible_cells[i,:,board[i,j]-1] = False
+                possible_cells[:,j,board[i,j]-1] = False
+                possible_cells[i//3*3:(i//3*3+3),j//3*3:(j//3*3+3),board[i,j]-1] = False
     return possible_cells
 class SudokuEnv(gym.Env):
     FILLED_ERROR_REWARD = -10
@@ -143,7 +141,7 @@ class SudokuEnv(gym.Env):
         # check
         possible_cells = calc_possible_cells(self.board)
 
-        if check_sudoku_board(self.board) and check_sub_blocks(possible_cells):
+        if check_sudoku_board(self.board) and check_sub_blocks(possible_cells, self.board):
             done = True
             reward = SudokuEnv.SUCCESS_REWARD
         else:
